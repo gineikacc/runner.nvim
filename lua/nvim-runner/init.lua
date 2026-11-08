@@ -851,6 +851,15 @@ local function create_commands()
 		{ name = "RunnerClose", cmd = M.close, opts = { desc = "Close the runner pane" } },
 		{ name = "RunnerClear", cmd = M.clear, opts = { desc = "Clear the runner output" } },
 		{
+			name = "RunnerForget",
+			cmd = function()
+				local cwd = current_context()
+				state.set_command(cwd, nil)
+				notify("runner: command forgotten for " .. vim.fn.fnamemodify(cwd, ":~"))
+			end,
+			opts = { desc = "Forget the runner command for this cwd" },
+		},
+		{
 			name = "RunnerFocus",
 			cmd = function(args)
 				local value = vim.trim(args.args or ""):lower()

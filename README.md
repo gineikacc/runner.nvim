@@ -75,6 +75,7 @@ Neovim in the project root if you keep multiple projects open.
 :RunnerStop             " stop the running job
 :RunnerClose            " close the pane
 :RunnerClear            " clear the output
+:RunnerForget           " forget the saved command for this cwd
 :RunnerFocus            " toggle focus stealing
 :RunnerFocus on|off     " set it explicitly
 :RunnerInfo             " show command/cwd/focus/state file
