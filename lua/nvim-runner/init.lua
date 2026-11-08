@@ -384,23 +384,36 @@ local function finish(code)
 	run.job = nil
 
 	local n = #run.items
-	if opts.quickfix and n > 0 then
-		local qf = {}
-		for _, item in ipairs(run.items) do
-			qf[#qf + 1] = {
-				filename = resolve(item.path, item.cwd or run.cwd),
-				lnum = item.lnum,
-				col = item.col,
-				text = item.message,
-				type = item.type,
-				valid = 1,
-			}
+	if opts.quickfix then
+		local title = ""
+		pcall(function()
+			title = vim.fn.getqflist({ title = 1 }).title or ""
+		end)
+
+		if n > 0 then
+			local qf = {}
+			for _, item in ipairs(run.items) do
+				qf[#qf + 1] = {
+					filename = resolve(item.path, item.cwd or run.cwd),
+					lnum = item.lnum,
+					col = item.col,
+					text = item.message,
+					type = item.type,
+					valid = 1,
+				}
+			end
+			pcall(vim.fn.setqflist, {}, "r", {
+				title = "runner: " .. (run.cmd or ""),
+				items = qf,
+				context = { runner = { cmd = run.cmd, cwd = run.cwd, code = code } },
+			})
+		elseif title:match("^runner:") then
+			-- Don't leave a stale runner quickfix list after a clean run.
+			pcall(vim.fn.setqflist, {}, "r", {
+				title = "runner: " .. (run.cmd or ""),
+				items = {},
+			})
 		end
-		pcall(vim.fn.setqflist, {}, "r", {
-			title = "runner: " .. (run.cmd or ""),
-			items = qf,
-			context = { runner = { cmd = run.cmd, cwd = run.cwd, code = code } },
-		})
 	end
 
 	local msg
@@ -681,9 +694,13 @@ function M.jump(loc)
 		end
 	end
 
-	vim.api.nvim_win_set_buf(target_win, target_buf)
+	local set_ok = pcall(vim.api.nvim_win_set_buf, target_win, target_buf)
+	if not set_ok then
+		vim.cmd("aboveleft split")
+		target_win = vim.api.nvim_get_current_win()
+		pcall(vim.api.nvim_win_set_buf, target_win, target_buf)
+	end
 	vim.api.nvim_set_current_win(target_win)
-
 	local count = vim.api.nvim_buf_line_count(target_buf)
 	local lnum = math.max(1, math.min(loc.lnum or 1, count))
 	local text = vim.api.nvim_buf_get_lines(target_buf, lnum - 1, lnum, false)[1] or ""
@@ -878,6 +895,15 @@ function M.setup(user_opts)
 	vim.api.nvim_create_autocmd("ColorScheme", {
 		group = "NvimRunner",
 		callback = define_highlights,
+	})
+	vim.api.nvim_create_autocmd("WinClosed", {
+		group = "NvimRunner",
+		callback = function(args)
+			if win and tonumber(args.match) == win then
+				win = nil
+				run.hidden = true
+			end
+		end,
 	})
 
 	create_commands()
