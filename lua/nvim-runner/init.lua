@@ -7,6 +7,7 @@
 
 local parser = require("nvim-runner.parser")
 local state = require("nvim-runner.state")
+local complete = require("nvim-runner.complete")
 
 local uv = vim.uv or vim.loop
 
@@ -16,6 +17,7 @@ local opts
 local buf
 local win
 local status_line
+local prompt_cwd
 
 local run = {
 	id = 0,
@@ -466,23 +468,14 @@ end
 function M.prompt(cwd, default)
 	ensure_setup()
 	cwd = cwd or vim.fn.getcwd()
-	local history = state.history(cwd)
-
-	_G._nvim_runner_complete = function(arglead)
-		local matches = {}
-		for _, cmd in ipairs(history) do
-			if vim.startswith(cmd, arglead) then
-				matches[#matches + 1] = cmd
-			end
-		end
-		return matches
-	end
+	prompt_cwd = cwd
 
 	local ok, result = pcall(vim.fn.input, {
 		prompt = "run [" .. vim.fn.fnamemodify(cwd, ":~") .. "]: ",
 		default = default or state.command(cwd) or "",
-		completion = "custom,_nvim_runner_complete",
+		completion = "customlist,NvimRunnerPromptComplete",
 	})
+	prompt_cwd = nil
 	if not ok or not result then
 		return nil
 	end
@@ -492,6 +485,42 @@ function M.prompt(cwd, default)
 		return nil
 	end
 	return result
+end
+
+-- Completion for :RunnerRun and :RunnerSet.  Vim includes the command name in
+-- the command line passed to completion functions, so strip it before
+-- deciding which word is the program name.
+function M.complete(arglead, cmdline, cursorpos)
+	ensure_setup()
+	local cwd = select(1, current_context())
+
+	cmdline = cmdline or ""
+	local offset = cmdline:match("^%s*%S+%s*()") or 1
+	local stripped = cmdline:sub(offset)
+	local pos = math.max(1, (cursorpos or (#cmdline + 1)) - offset + 1)
+
+	return complete.shell(arglead, stripped, pos, {
+		history = state.history(cwd),
+	})
+end
+
+-- Completion used by the input() prompt.  It is called through the small
+-- Vimscript wrapper installed by setup(), because input() completion names
+-- must refer to a Vimscript function.
+function M.complete_prompt(arglead, cmdline, cursorpos)
+	ensure_setup()
+	local cwd = prompt_cwd or select(1, current_context())
+	return complete.shell(arglead, cmdline, cursorpos, {
+		history = state.history(cwd),
+	})
+end
+
+local function define_completion_function()
+	vim.cmd([[
+		function! NvimRunnerPromptComplete(arglead, cmdline, cursorpos) abort
+			return luaeval('require("nvim-runner").complete_prompt(_A[1], _A[2], _A[3])', [a:arglead, a:cmdline, a:cursorpos])
+		endfunction
+	]])
 end
 
 function M.set()
@@ -829,7 +858,7 @@ local function create_commands()
 				local cmd = vim.trim(table.concat(args.fargs, " "))
 				M.run(cmd ~= "" and cmd or nil)
 			end,
-			opts = { nargs = "*", complete = "shellcmd", desc = "Run the current runner command" },
+			opts = { nargs = "*", complete = M.complete, desc = "Run the current runner command" },
 		},
 		{
 			name = "RunnerSet",
@@ -845,7 +874,7 @@ local function create_commands()
 				state.set_command(cwd, cmd)
 				notify("runner: command set: " .. cmd)
 			end,
-			opts = { nargs = "*", complete = "shellcmd", desc = "Set the runner command for this cwd" },
+			opts = { nargs = "*", complete = M.complete, desc = "Set the runner command for this cwd" },
 		},
 		{ name = "RunnerStop", cmd = M.stop, opts = { desc = "Stop the running command" } },
 		{ name = "RunnerClose", cmd = M.close, opts = { desc = "Close the runner pane" } },
@@ -880,6 +909,8 @@ local function create_commands()
 		pcall(vim.api.nvim_del_user_command, entry.name)
 		vim.api.nvim_create_user_command(entry.name, entry.cmd, entry.opts)
 	end
+
+	define_completion_function()
 end
 
 function M.setup(user_opts)
