@@ -921,9 +921,9 @@ function M.setup(user_opts)
 		quickfix = true,
 		auto_save = true,
 		keymaps = {
-			run = "<leader>r",
-			set = "<leader>R",
-			toggle_focus = "<leader>rf",
+			run = "<M-r>",
+			set = "<M-R>",
+			toggle_focus = "<M-f>",
 		},
 	}, user_opts or {})
 
@@ -948,20 +948,43 @@ function M.setup(user_opts)
 
 	create_commands()
 
+	-- Remember our own mappings so a later setup() call can replace them
+	-- without deleting a mapping the user made themselves.
+	local mapped = M._keymaps or {}
+	for lhs, desc in pairs(mapped) do
+		local current = vim.fn.maparg(lhs, "n", false, true)
+		if type(current) == "table" and current.desc == desc then
+			pcall(vim.keymap.del, "n", lhs)
+		end
+		mapped[lhs] = nil
+	end
+
 	local km = opts.keymaps
 	if km ~= false then
 		km = km or {}
+		local function configured(value, default)
+			if value == nil then
+				return default
+			end
+			return value
+		end
 		local function map(lhs, fn, desc)
 			if lhs and lhs ~= false then
 				vim.keymap.set("n", lhs, fn, { desc = desc })
+				mapped[lhs] = desc
 			end
 		end
-		map(km.run or "<leader>r", M.run, "Run command in output pane")
-		map(km.set or "<leader>R", M.set, "Set run command")
-		map(km.toggle_focus or "<leader>rf", M.toggle_focus, "Toggle run pane focus")
+		map(configured(km.run, "<M-r>"), M.run, "Run command in output pane")
+		map(configured(km.set, "<M-R>"), M.set, "Set run command")
+		map(configured(km.toggle_focus, "<M-f>"), M.toggle_focus, "Toggle run pane focus")
 	end
+	M._keymaps = mapped
 
 	return M
+end
+
+function M.is_setup()
+	return opts ~= nil
 end
 
 -- Useful for tests and for automation.
