@@ -1,4 +1,4 @@
--- Output parser for nvim-runner.
+-- Output parser for runner.nvim.
 --
 -- This is deliberately independent of any language server or compiler: it
 -- recognises the common "file:line[:col]" shapes emitted by gcc/clang, rustc,

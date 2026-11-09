@@ -1,11 +1,11 @@
-# AGENTS.md — nvim-runner
+# AGENTS.md — runner.nvim
 
 Notes for agents (and humans) working on this repository.  Keep this file up to
 date when behaviour or the architecture changes.
 
 ## What this is
 
-`nvim-runner` is a small standalone Neovim plugin.  It runs one shell command
+`runner.nvim` is a small standalone Neovim plugin.  It runs one shell command
 per working directory and streams the output into a persistent, clickable
 bottom split.  Output containing `file:line[:col]` is parsed into jump targets
 and also copied into Neovim's quickfix list.
@@ -17,11 +17,11 @@ It is plain Lua and has no build step.  Minimum version is Neovim 0.9
 
 | Path | Responsibility |
 | --- | --- |
-| `lua/nvim-runner/init.lua` | Public API, prompt, job lifecycle, output buffer, pane/window handling, navigation, user commands, keymaps, setup. |
-| `lua/nvim-runner/parser.lua` | Converts command output lines into `{ path, lnum, col, severity, message }` locations and highlight spans. |
-| `lua/nvim-runner/state.lua` | Persists the per-cwd command, per-cwd history, and focus preference as JSON. |
-| `lua/nvim-runner/complete.lua` | Shell-aware Tab completion for program names, file paths, and command history. |
-| `plugin/nvim-runner.lua` | Standard plugin entry point.  Guards against double-loading and applies default setup so the repository works immediately after installation. |
+| `lua/runner/init.lua` | Public API, prompt, job lifecycle, output buffer, pane/window handling, navigation, user commands, keymaps, setup. |
+| `lua/runner/parser.lua` | Converts command output lines into `{ path, lnum, col, severity, message }` locations and highlight spans. |
+| `lua/runner/state.lua` | Persists the per-cwd command, per-cwd history, and focus preference as JSON. |
+| `lua/runner/complete.lua` | Shell-aware Tab completion for program names, file paths, and command history. |
+| `plugin/runner.lua` | Standard plugin entry point.  Guards against double-loading and applies default setup so the repository works immediately after installation. |
 | `README.md` | User-facing documentation. |
 | `AGENTS.md` | This file: architecture, status, and agent workflow. |
 
@@ -30,7 +30,7 @@ headless commands that currently serve as the test suite.
 
 ## Run-time flow
 
-1. `plugin/nvim-runner.lua` calls `setup()` with defaults unless the user
+1. `plugin/runner.lua` calls `setup()` with defaults unless the user
    already called it.  `setup(opts)` merges defaults, loads state, defines
    highlights, installs the completion wrapper and autocmds, creates commands,
    and (re)installs global keymaps.  Calling `setup()` again is supported: old
@@ -59,7 +59,7 @@ ignored after a new run starts.
 
 ## State file
 
-`stdpath("state")/nvim-runner/state.json`:
+`stdpath("state")/runner/state.json`:
 
 ```json
 {
@@ -108,11 +108,11 @@ Two entry points:
   `nvim_create_user_command({ complete = ... })`.  Vim includes the command name
   in the command line, so `M.complete` strips the first token before calling
   `complete.shell`.
-- The `input()` prompt uses `completion = "customlist,NvimRunnerPromptComplete"`.
+- The `input()` prompt uses `completion = "customlist,RunnerPromptComplete"`.
   `setup()` defines that tiny Vimscript function; it forwards its three
   arguments through `luaeval()` to `M.complete_prompt`.  This wrapper is
   required: Lua functions stored in `_G` are **not** callable as Vimscript
-  functions, so the previous `custom,_nvim_runner_complete` approach silently
+  functions, so the previous `custom,_runner_complete` approach silently
   did not work with `input()`.
 
 `getcompletion("file")` resolves relative paths against the process cwd, which
@@ -161,7 +161,7 @@ mapping can be disabled by setting it to `false` in the `keymaps` table.
 ## Configuration
 
 ```lua
-require("nvim-runner").setup({
+require("runner").setup({
   focus = true,       -- focus the pane when it opens
   height = 12,        -- split height
   follow = true,      -- auto-scroll while output arrives
@@ -220,8 +220,8 @@ Load the plugin and check completion (run from a directory containing files):
 ```sh
 cd /tmp/some-project
 nvim --clean --headless -u NONE \
-  --cmd 'set rtp+=/home/blud/code/nvim-runner' \
-  -c 'lua require("nvim-runner").setup({ keymaps = false })' \
+  --cmd "set rtp+=$PWD" \
+  -c 'lua require("runner").setup({ keymaps = false })' \
   -c 'lua print(vim.inspect(vim.fn.getcompletion("RunnerRun gcc ma", "cmdline")))' \
   -c 'qa!'
 ```
@@ -230,8 +230,8 @@ Exercise the completion module directly:
 
 ```sh
 nvim --clean --headless -u NONE \
-  --cmd 'set rtp+=/home/blud/code/nvim-runner' \
-  -c 'lua local c=require("nvim-runner.complete"); print(vim.inspect(c.shell("ma","gcc ma",7,{history={"gcc main.c"}})))' \
+  --cmd "set rtp+=$PWD" \
+  -c 'lua local c=require("runner.complete"); print(vim.inspect(c.shell("ma","gcc ma",7,{history={"gcc main.c"}})))' \
   -c 'qa!'
 ```
 
@@ -239,8 +239,8 @@ Run a command and inspect the pane:
 
 ```sh
 nvim --clean --headless -u NONE \
-  --cmd 'set rtp+=/home/blud/code/nvim-runner' \
-  -c 'lua local r=require("nvim-runner"); r.setup({focus=false,keymaps=false}); r.run("echo hi"); vim.wait(5000,function() return not r.is_running() end); print(vim.inspect(vim.api.nvim_buf_get_lines(r.buffer(),0,-1,false)))' \
+  --cmd "set rtp+=$PWD" \
+  -c 'lua local r=require("runner"); r.setup({focus=false,keymaps=false}); r.run("echo hi"); vim.wait(5000,function() return not r.is_running() end); print(vim.inspect(vim.api.nvim_buf_get_lines(r.buffer(),0,-1,false)))' \
   -c 'qa!'
 ```
 
@@ -249,8 +249,8 @@ Verify a parsed location and jump:
 ```sh
 printf 'line1\nline2\nline3\n' > main.c
 nvim --clean --headless -u NONE \
-  --cmd 'set rtp+=/home/blud/code/nvim-runner' \
-  -c 'lua local r=require("nvim-runner"); r.setup({focus=false,keymaps=false}); r.run("printf \"main.c:2:3: error: boom\\n\""); vim.wait(5000,function() return not r.is_running() end); local l=r.locations()[2]; print(vim.inspect(l)); r.jump(l); print(vim.inspect(vim.api.nvim_win_get_cursor(0)))' \
+  --cmd "set rtp+=$PWD" \
+  -c 'lua local r=require("runner"); r.setup({focus=false,keymaps=false}); r.run("printf \"main.c:2:3: error: boom\\n\""); vim.wait(5000,function() return not r.is_running() end); local l=r.locations()[2]; print(vim.inspect(l)); r.jump(l); print(vim.inspect(vim.api.nvim_win_get_cursor(0)))' \
   -c 'qa!'
 ```
 
@@ -265,13 +265,13 @@ two even though both use `complete.lua`.
   inserted.  If the buffer is recreated, the old status line index is stale.
 - All job callbacks run through `vim.schedule()` and re-check `run.id`.
 - `M.jump` must never replace the runner pane with the target file.
-- Highlight extmarks use the `nvim-runner` namespace; clear it when re-rendering.
+- Highlight extmarks use the `runner` namespace; clear it when re-rendering.
 - `state.save()` is best-effort: failures are swallowed so a broken state file
   cannot break running commands.
 - `setup()` tracks the global maps it installs and removes them on the next
   call only if the description still matches.  Do not remove that check, or
   repeated setup calls could delete a user's remap.
-- `plugin/nvim-runner.lua` auto-calls `setup()` only when `is_setup()` is false,
+- `plugin/runner.lua` auto-calls `setup()` only when `is_setup()` is false,
   so a user config that runs before the plugin file is not overwritten.
 - Keep the public API table-friendly; `M.buffer()`, `M.window()`,
   `M.locations()`, `M.is_running()`, and `M.is_setup()` are used by

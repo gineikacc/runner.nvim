@@ -1,13 +1,13 @@
--- nvim-runner: a small Tsoding-style run panel.
+-- runner.nvim: a small Tsoding-style run panel.
 --
 -- The public API is intentionally table-friendly so it can be scripted:
---   require("nvim-runner").run("gcc main.c")
---   require("nvim-runner").set()
---   require("nvim-runner").toggle_focus()
+--   require("runner").run("gcc main.c")
+--   require("runner").set()
+--   require("runner").toggle_focus()
 
-local parser = require("nvim-runner.parser")
-local state = require("nvim-runner.state")
-local complete = require("nvim-runner.complete")
+local parser = require("runner.parser")
+local state = require("runner.state")
+local complete = require("runner.complete")
 
 local uv = vim.uv or vim.loop
 
@@ -33,7 +33,7 @@ local run = {
 	running = false,
 	stopped = false,
 	hidden = false,
-	ns = vim.api.nvim_create_namespace("nvim-runner"),
+	ns = vim.api.nvim_create_namespace("runner"),
 }
 
 local function notify(msg, level)
@@ -473,7 +473,7 @@ function M.prompt(cwd, default)
 	local ok, result = pcall(vim.fn.input, {
 		prompt = "run [" .. vim.fn.fnamemodify(cwd, ":~") .. "]: ",
 		default = default or state.command(cwd) or "",
-		completion = "customlist,NvimRunnerPromptComplete",
+		completion = "customlist,RunnerPromptComplete",
 	})
 	prompt_cwd = nil
 	if not ok or not result then
@@ -517,8 +517,8 @@ end
 
 local function define_completion_function()
 	vim.cmd([[
-		function! NvimRunnerPromptComplete(arglead, cmdline, cursorpos) abort
-			return luaeval('require("nvim-runner").complete_prompt(_A[1], _A[2], _A[3])', [a:arglead, a:cmdline, a:cursorpos])
+		function! RunnerPromptComplete(arglead, cmdline, cursorpos) abort
+			return luaeval('require("runner").complete_prompt(_A[1], _A[2], _A[3])', [a:arglead, a:cmdline, a:cursorpos])
 		endfunction
 	]])
 end
@@ -931,13 +931,13 @@ function M.setup(user_opts)
 	M._focus = state.focus(opts.focus)
 
 	define_highlights()
-	vim.api.nvim_create_augroup("NvimRunner", { clear = true })
+	vim.api.nvim_create_augroup("Runner", { clear = true })
 	vim.api.nvim_create_autocmd("ColorScheme", {
-		group = "NvimRunner",
+		group = "Runner",
 		callback = define_highlights,
 	})
 	vim.api.nvim_create_autocmd("WinClosed", {
-		group = "NvimRunner",
+		group = "Runner",
 		callback = function(args)
 			if win and tonumber(args.match) == win then
 				win = nil

@@ -1,4 +1,4 @@
-# nvim-runner
+# runner.nvim
 
 Run one command for your project and watch the output in a pane at the bottom
 of Neovim.  When the command prints `file:line:column` locations, they become
@@ -31,7 +31,7 @@ normal plugin manager works.
 
 ```lua
 {
-  "YOURNAME/nvim-runner",
+  "YOURNAME/runner.nvim",
   lazy = false,
   opts = {
     -- optional; the defaults are good
@@ -45,13 +45,13 @@ settings.  See [Configuration](#configuration) when you want to change them.
 ### vim-plug
 
 ```vim
-Plug 'YOURNAME/nvim-runner'
+Plug 'YOURNAME/runner.nvim'
 ```
 
 Restart Neovim.  To customize, add this after `plug#end()`:
 
 ```lua
-require("nvim-runner").setup({
+require("runner").setup({
   height = 16,
 })
 ```
@@ -61,14 +61,14 @@ require("nvim-runner").setup({
 Clone the repository into a directory Neovim already loads:
 
 ```sh
-git clone https://github.com/YOURNAME/nvim-runner \
-  ~/.local/share/nvim/site/pack/plugins/start/nvim-runner
+git clone https://github.com/YOURNAME/runner.nvim \
+  ~/.local/share/nvim/site/pack/plugins/start/runner.nvim
 ```
 
 Or put it anywhere on `runtimepath` and run:
 
 ```vim
-:packadd nvim-runner
+:packadd runner.nvim
 ```
 
 ## Quick start
@@ -167,7 +167,7 @@ Other shell variables, such as `$HOME`, are left alone.
 All settings are optional:
 
 ```lua
-require("nvim-runner").setup({
+require("runner").setup({
   focus = true,       -- focus the output pane when it opens
   height = 12,        -- pane height
   follow = true,      -- keep the pane scrolled to the bottom
@@ -221,7 +221,7 @@ A later clean run clears the stale runner quickfix list.
 Commands and history are stored in:
 
 ```text
-stdpath("state")/nvim-runner/state.json
+stdpath("state")/runner/state.json
 ```
 
 Nothing is written into your project directories.
@@ -237,8 +237,8 @@ A quick command-run check:
 
 ```sh
 nvim --headless -u NONE \
-  --cmd 'set rtp+=/path/to/nvim-runner' \
-  -c 'lua local r=require("nvim-runner"); r.setup({focus=false,keymaps=false}); r.run("echo hi"); vim.wait(5000,function() return not r.is_running() end); print(vim.inspect(vim.api.nvim_buf_get_lines(r.buffer(),0,-1,false)))' \
+  --cmd 'set rtp+=/path/to/runner.nvim' \
+  -c 'lua local r=require("runner"); r.setup({focus=false,keymaps=false}); r.run("echo hi"); vim.wait(5000,function() return not r.is_running() end); print(vim.inspect(vim.api.nvim_buf_get_lines(r.buffer(),0,-1,false)))' \
   -c 'qa!'
 ```
 

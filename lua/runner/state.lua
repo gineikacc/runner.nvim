@@ -1,4 +1,4 @@
--- Persistent state for nvim-runner.
+-- Persistent state for runner.nvim.
 --
 -- Commands are stored per working directory in Neovim's state directory, so
 -- nothing is written into your projects.  The file is intentionally tiny and
@@ -13,7 +13,7 @@
 
 local M = {}
 
-local state_dir = vim.fn.stdpath("state") .. "/nvim-runner"
+local state_dir = vim.fn.stdpath("state") .. "/runner"
 local state_file = state_dir .. "/state.json"
 
 local data = {
