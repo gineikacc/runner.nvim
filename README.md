@@ -1,25 +1,22 @@
 # nvim-runner
 
-A small standalone Neovim plugin that runs one **run command** and shows its
-output in a persistent, clickable bottom pane.  It is inspired by the run
-buffers Tsoding uses, but it parses `file:line:column` locations and can jump
-straight to them.
+Run one command for your project and watch the output in a pane at the bottom
+of Neovim.  When the command prints `file:line:column` locations, they become
+clickable links, so you can jump straight from a compiler error to the source.
 
-## Features
+It is a small, plain-Lua plugin with no build step and no dependencies.
 
-- One run command per working directory, stored in Neovim's state directory.
-- `<leader>r` runs it; if nothing is configured yet, you are prompted.
-- `<leader>R` prompts for/updates the command for the current directory.
-- Output pane at the bottom, live output, auto-scroll, exit status.
-- Click a `file:line:col` field (or press `<CR>`) to open that location.
-- The source is opened in the editor window; the run pane stays visible.
-- Colour-coded file/line/column, severity (`error`, `warning`, `note`, ...),
-  and message fields.
-- Parses many common formats: gcc/clang, rustc, go, Python, tsc, eslint,
-  pylint/ruff, shellcheck, CMake, GNU make, Node stack traces, and more.
-- Also fills Neovim's quickfix list in the background, so `:cnext`, `:cprev`,
-  and your existing quickfix keys work too.
-- Focus stealing is on by default and can be toggled.
+## What you get
+
+- A run command saved per working directory, so each project remembers its own
+  build/test command.
+- Live output in a persistent bottom pane, with auto-scroll and exit status.
+- Clickable error locations, also copied into Neovim's quickfix list.
+- Nice highlighting for paths, line/column numbers, and severities.
+- Parsing for many common tools: gcc/clang, rustc, Go, Python, tsc, eslint,
+  pylint/ruff, shellcheck, CMake, make, Node stack traces, and more.
+- Tab completion for program names, file paths, and previous commands.
+- Optional focus stealing: choose whether the output pane takes your cursor.
 
 ## Requirements
 
@@ -27,131 +24,175 @@ straight to them.
 
 ## Installation
 
-This repository lives outside the Neovim config.  With lazy.nvim, point `dir`
-at it:
+The plugin uses the standard Neovim layout (`lua/` plus `plugin/`), so any
+normal plugin manager works.
+
+### lazy.nvim
 
 ```lua
--- ~/.config/nvim/lua/config/plugins/nvim-runner.lua
-return {
-  {
-    dir = vim.fn.expand("~/code/nvim-runner"),
-    name = "nvim-runner",
-    lazy = false,
-    opts = {
-      focus = true,
-      height = 12,
-      follow = true,
-      quickfix = true,
-      auto_save = true,
-      keymaps = {
-        run = "<leader>r",
-        set = "<leader>R",
-        toggle_focus = "<leader>rf",
-      },
-    },
-    config = function(_, opts)
-      require("nvim-runner").setup(opts)
-    end,
+{
+  "YOURNAME/nvim-runner",
+  lazy = false,
+  opts = {
+    -- optional; the defaults are good
   },
 }
 ```
 
-Then run `:Lazy reload nvim-runner` or restart Neovim.
+Calling `setup()` is optional.  Without it, the plugin starts with its default
+settings.  See [Configuration](#configuration) when you want to change them.
 
-## Usage
-
-1. `:RunnerSet gcc main.c` (or `<leader>R` and type it).
-2. `<leader>r` to run it.
-3. Click an error line, or move to it and press `<CR>`.
-
-The command is remembered per current working directory.  Use `:cd` or start
-Neovim in the project root if you keep multiple projects open.
+### vim-plug
 
 ```vim
-:RunnerRun              " run saved command, prompt if missing
-:RunnerRun gcc main.c   " run and save this command
-:RunnerSet              " prompt for a command
-:RunnerSet make -j      " set without running
-:RunnerStop             " stop the running job
-:RunnerClose            " close the pane
-:RunnerClear            " clear the output
-:RunnerForget           " forget the saved command for this cwd
-:RunnerFocus            " toggle focus stealing
-:RunnerFocus on|off     " set it explicitly
-:RunnerInfo             " show command/cwd/focus/state file
+Plug 'YOURNAME/nvim-runner'
 ```
 
-### Command placeholders
+Restart Neovim.  To customize, add this after `plug#end()`:
 
-Before running, these are expanded in the command string:
+```lua
+require("nvim-runner").setup({
+  height = 16,
+})
+```
+
+### Manual installation
+
+Clone the repository into a directory Neovim already loads:
+
+```sh
+git clone https://github.com/YOURNAME/nvim-runner \
+  ~/.local/share/nvim/site/pack/plugins/start/nvim-runner
+```
+
+Or put it anywhere on `runtimepath` and run:
+
+```vim
+:packadd nvim-runner
+```
+
+## Quick start
+
+1. Open a project file.
+2. Set the command with `:RunnerSet` or press Alt+R (`<M-R>`).
+3. Run it with `:RunnerRun` or press Alt+r (`<M-r>`).
+4. Click an error, or move to it and press `<CR>`.
+
+Example:
+
+```vim
+:RunnerSet gcc main.c -o app && ./app
+```
+
+The command is stored for the current working directory.  Start Neovim in the
+project root (or use `:cd`) if you keep several projects open.
+
+> Alt key mappings need a terminal that sends Alt/Meta combinations to
+> Neovim.  If your terminal intercepts them, see
+> [Configuration](#configuration) and choose different keys.
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `:RunnerRun` | Run the saved command, or prompt if there is none. |
+| `:RunnerRun gcc main.c` | Run this command and save it. |
+| `:RunnerSet` | Prompt for a command and save it. |
+| `:RunnerSet make -j` | Save a command without running it. |
+| `:RunnerStop` | Stop the running job. |
+| `:RunnerClose` | Close the output pane. |
+| `:RunnerClear` | Clear the output. |
+| `:RunnerForget` | Forget the saved command for this directory. |
+| `:RunnerFocus` | Toggle focus stealing. |
+| `:RunnerFocus on\|off` | Set focus stealing explicitly. |
+| `:RunnerInfo` | Show the command, directory, focus setting, and state file. |
+
+## Default keymaps
+
+| Key | Action |
+| --- | --- |
+| `<M-r>` | Run the saved command, or prompt for one. |
+| `<M-R>` | Set/update the command. |
+| `<M-f>` | Toggle whether the pane steals focus. |
+
+While the output pane is focused:
+
+| Key | Action |
+| --- | --- |
+| `<CR>` | Open the location under the cursor. |
+| `<LeftMouse>` / double click | Open the clicked location. |
+| `<C-n>` / `<C-p>` | Jump to the next / previous location. |
+| `R` | Run the command again. |
+| `<C-c>` | Stop the running job. |
+| `q` | Close the pane; the job keeps running. |
+
+## Tab completion
+
+Press Tab while typing a command, either in the run prompt or after
+`:RunnerRun` / `:RunnerSet`.
+
+- The first word completes program names from your `PATH`.
+- Later words complete file and directory paths.
+- Previous commands for the current directory are suggested too.
+- Paths with spaces are escaped for you.
+
+Examples:
+
+```vim
+:RunnerSet gcc ma<Tab>          " -> gcc main.c
+:RunnerRun ./scripts/te<Tab>    " -> ./scripts/test.sh
+```
+
+## Command placeholders
+
+These are expanded just before the command runs:
 
 | Placeholder | Value |
 | --- | --- |
-| `$FILE` | absolute path of the file in the editor window |
-| `$RELFILE` | that file relative to the working directory |
-| `$DIR` | directory of that file |
-| `$ROOT`, `$CWD` | the runner working directory |
+| `$FILE` | Absolute path of the file in the editor window. |
+| `$RELFILE` | That file relative to the working directory. |
+| `$DIR` | Directory containing that file. |
+| `$ROOT`, `$CWD` | The runner working directory. |
 
-Quote them if the path may contain spaces, for example:
+Quote them if paths may contain spaces:
 
 ```vim
 :RunnerSet gcc "$FILE" -o /tmp/a.out && /tmp/a.out
 ```
 
-Other shell variables such as `$HOME` are left alone.
-
-## Run pane keys
-
-| Key | Action |
-| --- | --- |
-| `<CR>` | open the location under the cursor |
-| `<LeftMouse>` / double click | open the clicked location |
-| `<C-n>` / `<C-p>` | next / previous location |
-| `R` | run the command again |
-| `<C-c>` | stop the running job |
-| `q` | close the pane (the job keeps running) |
-
-Quickfix is replaced with the locations from the latest runner command (when
-there is at least one location).  Existing quickfix navigation then works.
+Other shell variables, such as `$HOME`, are left alone.
 
 ## Configuration
 
+All settings are optional:
+
 ```lua
 require("nvim-runner").setup({
-  focus = true,       -- focus the run pane when it opens
-  height = 12,        -- split height
-  follow = true,      -- stick to the bottom while output arrives
-  quickfix = true,    -- populate the quickfix list
+  focus = true,       -- focus the output pane when it opens
+  height = 12,        -- pane height
+  follow = true,      -- keep the pane scrolled to the bottom
+  quickfix = true,    -- replace quickfix with the latest run's locations
   auto_save = true,   -- write modified buffers before running
   keymaps = {
-    run = "<leader>r",
-    set = "<leader>R",
-    toggle_focus = "<leader>rf",
+    run = "<M-r>",
+    set = "<M-R>",
+    toggle_focus = "<M-f>",
   },
-  -- keymaps = false  -- disable all global mappings
 })
 ```
 
-`focus` can also be changed at runtime with `<leader>rf`,
-`:RunnerFocus`, or `:RunnerFocus on|off`.  The setting is persisted.
+`keymaps = false` disables all three global mappings.  You can also disable one
+of them with `run = false`, `set = false`, or `toggle_focus = false`.
 
-## State file
-
-Commands and history are stored in:
-
-```
-stdpath("state")/nvim-runner/state.json
-```
-
-Nothing is written into your project directories.  Prompt history is available
-with Tab completion after the first command has been run in that directory.
+Focus stealing is remembered between sessions.  Change it at runtime with
+`<M-f>`, `:RunnerFocus`, or `:RunnerFocus on|off`.
 
 ## How locations are found
 
-The parser is intentionally independent of LSP and compilers.  It recognises
-the usual shapes, including:
+The parser does not need an LSP or special compiler flags.  It recognises the
+usual `file:line[:column]` output shapes, including:
 
-```
+```text
 main.c:5:9: error: 'x' undeclared
 src/main.rs:5:9: error[E0308]: mismatched types
   --> src/main.rs:5:9
@@ -168,21 +209,38 @@ thread 'main' panicked at src/main.rs:4:5:
     at Object.<anonymous> (/home/x/index.js:10:15)
 ```
 
-Compiler display columns are converted to byte offsets, so tab-indented code
-still jumps to the right character.
+Compiler columns are converted to byte offsets, so jumping still lands on the
+right character in tab-indented files.
+
+When a run produces locations, the runner replaces Neovim's quickfix list with
+them.  `:cnext`, `:cprev`, and your existing quickfix workflow keep working.
+A later clean run clears the stale runner quickfix list.
+
+## Where state lives
+
+Commands and history are stored in:
+
+```text
+stdpath("state")/nvim-runner/state.json
+```
+
+Nothing is written into your project directories.
 
 ## Development
 
-The plugin is plain Lua and has no build step.  A quick smoke test:
+The plugin is plain Lua.  There is no build step and no generated code.
+
+See [`AGENTS.md`](AGENTS.md) for the architecture, completion internals, status
+checklist, and headless smoke tests.
+
+A quick command-run check:
 
 ```sh
 nvim --headless -u NONE \
-  --cmd 'set rtp+=/home/blud/code/nvim-runner' \
-  -c 'lua require("nvim-runner").setup({ focus = false })' \
-  -c 'lua require("nvim-runner").run("gcc main.c")' \
-  -c 'lua vim.wait(10000, function() return not require("nvim-runner").is_running() end)' \
+  --cmd 'set rtp+=/path/to/nvim-runner' \
+  -c 'lua local r=require("nvim-runner"); r.setup({focus=false,keymaps=false}); r.run("echo hi"); vim.wait(5000,function() return not r.is_running() end); print(vim.inspect(vim.api.nvim_buf_get_lines(r.buffer(),0,-1,false)))' \
   -c 'qa!'
 ```
 
-`require("nvim-runner").buffer()`, `.window()`, `.locations()`, and
-`.is_running()` are exposed for tests and scripting.
+The module also exposes `buffer()`, `window()`, `locations()`, `is_running()`,
+and `is_setup()` for scripting and tests.
