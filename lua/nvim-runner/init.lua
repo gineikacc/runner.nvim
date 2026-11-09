@@ -569,7 +569,7 @@ function M.run(cmd)
 	run.stopped = false
 	run.hidden = false
 
-	if opts.auto_save and vim.o.autowrite then
+	if opts.auto_save then
 		pcall(vim.cmd, "silent! wall")
 	end
 
